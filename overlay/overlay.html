@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Mentor64</title>
+  <link rel="stylesheet" href="overlay.css" />
+</head>
+<body>
+  <div id="root">
+    <div id="panel" hidden>
+      <div id="bar" class="panel-header">
+        <div class="panel-header-left">
+          <span id="title">Mentor64<span class="dot">.</span></span>
+          <span id="fair" class="pill" hidden title="Pas d'analyse pendant une partie en direct contre un humain.">En pause</span>
+        </div>
+        <span id="status">chargement du moteur…</span>
+        <div class="panel-header-right">
+          <button id="gear" title="Réglages">⚙</button>
+          <button id="close" title="Réduire">⌄</button>
+        </div>
+      </div>
+      <div class="checker" aria-hidden="true"></div>
+
+      <div id="settings" hidden>
+        <label class="row"><span>Moteur</span>
+          <select id="engineSel"></select></label>
+        <p id="engineNote" class="note"></p>
+        <div class="row">
+          <span>Temps de calcul</span>
+          <input id="think" type="range" min="200" max="5000" step="100" />
+          <span id="thinkVal" class="val"></span>
+        </div>
+        <label class="row switch"><span>Conseils du coach</span>
+          <span class="toggle"><input id="coachOn" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Flèche du meilleur coup sur l'échiquier</span>
+          <span class="toggle"><input id="arrowOn" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Flèche de votre coup (niveau humain)</span>
+          <span class="toggle"><input id="nextOn" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Flèches coup adverse + premove</span>
+          <span class="toggle"><input id="oppOn" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <p class="note">Flèches orange (votre coup), rouge (coup adverse attendu) et verte (premove) : recherche limitée à 3–5 demi-coups pour des coups naturels. Jamais pendant une partie contre un humain.</p>
+        <div class="kicker neon">Pendant vos parties</div>
+        <p class="note">Sans moteur ni conseil : ces outils ne font que masquer, lire la pendule et déplacer l'échiquier.</p>
+        <label class="row switch"><span>Masquer les classements</span>
+          <span class="toggle"><input id="lvRatings" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Anonymiser l'adversaire</span>
+          <span class="toggle"><input id="lvAnon" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Alarme sonore à 30 s et 10 s</span>
+          <span class="toggle"><input id="lvLowTime" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Halo selon l'avance à la pendule</span>
+          <span class="toggle"><input id="lvGlow" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Halo toute la partie (sinon sous 10 s)</span>
+          <span class="toggle"><input id="lvGlowFull" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <div class="row"><button id="pip" class="claim">Échiquier en fenêtre flottante</button><span id="pipStatus" class="note"></span></div>
+        <div class="kicker neon">chess.com</div>
+        <label class="row switch"><span>Score à vie contre l'adversaire</span>
+          <span class="toggle"><input id="lvLifetime" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Flèches colorées et numérotées</span>
+          <span class="toggle"><input id="lvArrows" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Masquer les pubs et le superflu</span>
+          <span class="toggle"><input id="lvClutter" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <label class="row switch"><span>Votre classement sur la page Amis</span>
+          <span class="toggle"><input id="lvFriends" type="checkbox" /><span class="toggle-slider"></span></span></label>
+        <div class="row"><button id="session" class="claim">Mode session (N parties, N minutes…)</button></div>
+        <button id="resetProfile" class="link">Effacer l'historique du profil</button>
+      </div>
+
+      <div id="tabs" role="tablist">
+        <button role="tab" data-tab="move" class="active">Coup</button>
+        <button role="tab" data-tab="sheet">Fiche de partie</button>
+        <button role="tab" data-tab="profile">Votre profil</button>
+      </div>
+
+      <section id="tab-move" class="tab">
+        <div id="acc">
+          <div class="acc-card">
+            <div class="ring"><svg viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="18"/><circle id="ringW" class="ring-fg" cx="22" cy="22" r="18"/></svg><span id="accW" class="ring-val">—</span></div>
+            <div><div class="acc-side"><span class="chip w"></span>Blancs</div><div class="acc-label">Précision</div></div>
+          </div>
+          <div class="acc-card">
+            <div class="ring"><svg viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="18"/><circle id="ringB" class="ring-fg" cx="22" cy="22" r="18"/></svg><span id="accB" class="ring-val">—</span></div>
+            <div><div class="acc-side"><span class="chip b"></span>Noirs</div><div class="acc-label">Précision</div></div>
+          </div>
+        </div>
+
+        <div id="main">
+          <div id="tableWrap">
+            <div id="table"></div>
+            <div id="caption"></div>
+          </div>
+
+          <div id="side">
+            <div id="info">
+              <div id="badgeRow">
+                <div id="badge" class="cat-none"><span id="glyph">·</span></div>
+                <div>
+                  <div id="label">En attente de coups</div>
+                  <div id="move">—</div>
+                </div>
+              </div>
+              <div id="evals"><span id="evalBefore">·</span><span class="arrow">→</span><span id="evalAfter">·</span></div>
+              <div id="opening"></div>
+              <div id="detail"></div>
+              <div id="bestline"></div>
+            </div>
+            <div id="coach" hidden></div>
+            <details id="principles" class="card fold" hidden></details>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-sheet" class="tab" hidden></section>
+      <section id="tab-profile" class="tab" hidden></section>
+    </div>
+
+    <button id="launcher" title="Mentor64">
+      <span id="lglyph">♞</span>
+      <span id="lbadge" class="lbadge" hidden></span>
+    </button>
+  </div>
+  <script type="module" src="overlay.js"></script>
+</body>
+</html>

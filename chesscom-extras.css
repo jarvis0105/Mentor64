@@ -1,0 +1,72 @@
+/* Mentor64, chess.com comfort tools (styles adapted from Chess.com Enhancer, ISC).
+   Each rule is gated by a class on <html> or by our own ids, so nothing changes while off. */
+
+/* coloured arrows, in pairs */
+html.mentor64-arrows .arrows .arrow { fill: var(--m64-arrow, currentColor) !important; stroke: var(--m64-arrow, currentColor) !important; }
+html.mentor64-arrows .arrows .arrow:nth-child(10n + 1), html.mentor64-arrows .arrows .arrow:nth-child(10n + 2) { --m64-arrow: #a2d060; }
+html.mentor64-arrows .arrows .arrow:nth-child(10n + 3), html.mentor64-arrows .arrows .arrow:nth-child(10n + 4) { --m64-arrow: #40c9c6; }
+html.mentor64-arrows .arrows .arrow:nth-child(10n + 5), html.mentor64-arrows .arrows .arrow:nth-child(10n + 6) { --m64-arrow: #d46aff; }
+html.mentor64-arrows .arrows .arrow:nth-child(10n + 7), html.mentor64-arrows .arrows .arrow:nth-child(10n + 8) { --m64-arrow: #f5a623; }
+html.mentor64-arrows .arrows .arrow:nth-child(10n + 9), html.mentor64-arrows .arrows .arrow:nth-child(10n + 10) { --m64-arrow: #7c3aed; }
+.mentor64-arrow-label {
+  position: absolute; transform: translate(-50%, -50%); z-index: 2; pointer-events: none;
+  font-size: 1.3rem; font-weight: 700; line-height: 1.2; padding: 1px 5px;
+  color: #0e283d; background: #fff; border-radius: 9999px;
+}
+
+/* page clutter */
+html.mentor64-clutter .game-over-coach-speech-component,
+html.mentor64-clutter .game-over-ad-container-component,
+html.mentor64-clutter .game-over-ad-sidecar-component,
+html.mentor64-clutter .evaluation-upgrade,
+html.mentor64-clutter [data-cy="game-over-ad-container"],
+html.mentor64-clutter #board-layout-ad { display: none !important; }
+
+/* lifetime score */
+.mentor64-lifetime {
+  display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
+  margin-right: 1rem; padding: 0 1rem; border-radius: 3px; line-height: 1; color: var(--color-text-bolder);
+}
+.mentor64-lifetime:hover { background-color: var(--color-bg-subtle); }
+.mentor64-lifetime h5 { font-size: 1.2rem; font-weight: 400; color: var(--color-text-subtle); }
+.mentor64-lifetime div { font-size: 1.4rem; }
+.mentor64-lifetime .sl { color: var(--color-text-subtle); }
+.mentor64-lifetime .w { color: var(--color-text-win); }
+.mentor64-lifetime .l { color: var(--color-text-loss); }
+
+/* friends page */
+.mentor64-my-score-row { background-color: rgba(129, 182, 76, 0.15) !important; border-left: 3px solid #81b64c !important; }
+
+/* session mode */
+#mentor64-session {
+  position: fixed; top: 72px; right: 16px; width: 25rem; margin: 0; z-index: 2147483640;
+  background-color: var(--color-bg-secondary); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+#mentor64-session-popover { min-width: 300px; background-color: var(--color-bg-primary); background-image: none; }
+#mentor64-session-popover::backdrop { background-color: rgba(0, 0, 0, 0.75); }
+#mentor64-session, #mentor64-session-popover { border: none; border-radius: 10px; color: canvastext; padding: 0; }
+#mentor64-session > *, #mentor64-session-popover > * { padding: 18px; }
+#mentor64-session .header-title-component, #mentor64-session-popover .header-title-component {
+  width: auto; background-color: var(--color-transparent-black-20); border-radius: 10px 10px 0 0;
+}
+.mentor64-session-content { display: flex; flex-direction: column; gap: 18px; text-align: center; }
+.mentor64-session-content[hidden] { display: none; }
+.mentor64-session-content p { font-weight: 500; }
+.mentor64-session-buttons { display: flex; gap: 10px; }
+.mentor64-session-buttons button { flex: 1; }
+.mentor64-session-inputs { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.mentor64-session-inputs input, .mentor64-session-inputs select { border: none; font-size: 15px; font-weight: bold; padding: 0.5rem; }
+.mentor64-session-inputs input { width: 5ch; text-align: center; }
+.mentor64-session-presets { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; opacity: 0.8; }
+.mentor64-countdown { font-size: 1.7rem; font-weight: 800; line-height: 1; color: var(--color-text-bolder); }
+.mentor64-countdown-bar {
+  height: 10px; width: 100%; border-radius: 4px;
+  background: linear-gradient(to left, #0e283d, #a2d060); box-shadow: 0 0 14px 0 #a2d06054;
+}
+.mentor64-results { display: flex; gap: 2rem; justify-content: center; font-size: 1.4rem; font-weight: 600; }
+.mentor64-results .w { color: var(--color-text-win); }
+.mentor64-results .l { color: var(--color-text-loss); }
+.mentor64-stats {
+  display: grid; grid-template-columns: auto auto; column-gap: 1.5rem; width: fit-content; margin: 0.5rem auto 0;
+  font-size: 1.3rem; font-weight: 600; text-align: left; opacity: 0.8;
+}
