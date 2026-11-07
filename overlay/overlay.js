@@ -160,13 +160,27 @@ async function humanLine(fen, gen) {
   humanPv.set(fen, r.lines[0].pv);
   return r.lines[0].pv;
 }
+/** "À jouer : humain Nf3 · meilleur Nf3" for the position after the move shown. */
+function renderNext(g) {
+  const el = $("nextline");
+  const pv = humanPv.get(fens[g.ply + 1]);
+  const deep = g.after && !g.after.terminal && g.after.lines && g.after.lines[0] && g.after.lines[0].pv[0];
+  if (!pv || !deep || !(settings.nextArrow || settings.oppArrow)) { el.textContent = ""; return; }
+  const san = (u) => pvToSan(fens[g.ply + 1], [u], 1);
+  const same = pv[0] === deep;
+  el.replaceChildren("À jouer : ", h("b", "hn", "humain " + san(pv[0])), " · ", h("b", "dp", "meilleur " + san(deep)),
+    same ? " (le même coup)" : "");
+}
 function playArrows(g) {
   const pv = humanPv.get(fens[g.ply + 1]);
   if (!pv) return {};
   const a = (u) => (u ? { from: u.slice(0, 2), to: u.slice(2, 4) } : null);
   const toMove = g.ply % 2 === 0 ? "b" : "w";
-  if (toMove === (mineSide() || (flipped ? "b" : "w"))) return { next: settings.nextArrow ? a(pv[0]) : null };
-  return settings.oppArrow ? { opp: a(pv[0]), pre: a(pv[1]) } : {};
+  // the engine's deepest move, drawn dashed only when it differs from the human one
+  const deepUci = g.after && !g.after.terminal && g.after.lines && g.after.lines[0] && g.after.lines[0].pv[0];
+  const deep = deepUci && deepUci !== pv[0] ? a(deepUci) : null;
+  if (toMove === (mineSide() || (flipped ? "b" : "w"))) return settings.nextArrow ? { next: a(pv[0]), deep } : {};
+  return settings.oppArrow ? { opp: a(pv[0]), pre: a(pv[1]), deep } : {};
 }
 
 function postGrade(g) {
@@ -439,6 +453,7 @@ async function run() {
   if (g && !g.after.terminal && (settings.nextArrow || settings.oppArrow)) {
     await humanLine(fens[last + 1], gen);
     if (gen !== generation) return;
+    if (selected < 0 || selected === last) renderNext(g);
     postGrade(g);
   }
 
@@ -482,8 +497,10 @@ function renderCoach(g) {
   const head = h("div", "chead");
   head.append(h("span", "cicon", tip.icon), h("span", "ctitle", tip.title));
   const how = h("div", "chow");
-  how.append(h("b", null, "Pour progresser : "), tip.how);
-  box.replaceChildren(h("div", "kicker neon", tip.label), head, h("div", "ctext", tip.text), how);
+  how.append(h("b", null, tip.howLabel || "Pour progresser : "), tip.how);
+  const parts = [h("div", "kicker neon", tip.label), head, h("div", "ctext", tip.text)];
+  if (tip.why) { const why = h("div", "chow"); why.append(h("b", null, "Pourquoi : "), tip.why); parts.push(why); }
+  box.replaceChildren(...parts, how);
 }
 
 // ----------------------------------------------------------------- summary table + accuracy
@@ -610,7 +627,6 @@ function renderGrade(g) {
 
   const bits = [];
   if (g.loss > 0.05) bits.push(`−${g.loss.toFixed(1)} % de chances de gain`);
-  if (g.isEngineBest) bits.push("premier choix du moteur");
   if (g.fromBook) bits.push("théorie d'ouverture…");
   else bits.push(`profondeur ${g.depth}${g.provisional ? "…" : ""}`);
   els.detail.textContent = bits.join(" · ");
@@ -620,6 +636,7 @@ function renderGrade(g) {
   } else {
     els.bestline.textContent = "";
   }
+  renderNext(g);
   // the on-board badge only ever shows the latest move
   renderCoach(g);
   if (g.ply === sans.length - 1) postGrade(g);

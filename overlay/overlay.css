@@ -196,6 +196,9 @@ button:focus-visible, input:focus-visible + .toggle-slider { outline: 2px solid 
 #detail, #bestline { color: var(--text-soft); font-size: 11px; }
 #bestline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #bestline b { color: var(--text); }
+#nextline { color: var(--text-soft); font-size: 11px; }
+#nextline .hn { color: #fbbf24; }
+#nextline .dp { color: #e879f9; }
 
 /* coach card: the category kicker in neon, a ruled "how to progress" line */
 #coach { border-color: var(--neon); box-shadow: 0 0 10px #3b9dff33; animation: fade-up var(--ease); }

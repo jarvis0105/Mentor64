@@ -176,6 +176,94 @@ export const TIP_CATS = {
  * the coach then has something to say about almost every move, for both sides.
  */
 const CENTRE = new Set(["d4", "e4", "d5", "e5"]);
+
+/** What a move does, in a few words: "prend la dame en d5", "donne échec", "développe le cavalier"… */
+function whatItDoes(mv, side) {
+  if (!mv) return "";
+  const parts = [];
+  if (mv.flags.includes("k") || mv.flags.includes("q")) parts.push("met le roi à l'abri par le roque");
+  else if (mv.captured) parts.push(`prend ${ARTICLE[mv.captured]} en ${mv.to}`);
+  else if (START[side][mv.from] === mv.piece) parts.push(`développe ${ARTICLE[mv.piece]}`);
+  else if (CENTRE.has(mv.to)) parts.push("prend le centre");
+  if (mv.san.includes("#")) parts.push("fait mat");
+  else if (mv.san.includes("+")) parts.push("donne échec");
+  return parts.join(" et ") || `amène ${ARTICLE[mv.piece]} en ${mv.to}`;
+}
+
+/** Pieces of `side` (not pawns, not the king) attacked and either undefended or attacked by something cheaper. */
+function hanging(chess, side) {
+  const opp = side === "w" ? "b" : "w";
+  const out = new Set();
+  for (const row of chess.board()) for (const p of row) {
+    if (!p || p.color !== side || p.type === "p" || p.type === "k") continue;
+    const att = chess.attackers(p.square, opp);
+    if (!att.length) continue;
+    const cheapest = Math.min(...att.map((sq) => VAL[chess.get(sq).type] || 0));
+    if (!chess.attackers(p.square, side).length || cheapest < VAL[p.type]) out.add(p.square);
+  }
+  return out;
+}
+
+/**
+ * Why the move is good or bad, from concrete facts on the board: what the best answer to it
+ * wins, what it left hanging, what threat it parried or created, what the better move did.
+ */
+function whyMove(g, ctx, bestMv) {
+  const m = g.move, side = m.color, ply = ctx.ply;
+  const bad = ["inaccuracy", "mistake", "miss", "blunder"].includes(g.cat) || (g.loss || 0) >= 3;
+  let reply = null;
+  const uci = g.after && g.after.lines && g.after.lines[0] && g.after.lines[0].pv[0];
+  if (uci) try { reply = new Chess(ctx.fens[ply + 1]).move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }); } catch { /* none */ }
+  let before = null, after = null;
+  try { before = new Chess(ctx.fens[ply]); after = new Chess(ctx.fens[ply + 1]); } catch { /* none */ }
+
+  if (bad) {
+    let reason = "";
+    if (reply && reply.captured && reply.captured !== "p")
+      reason = `il laisse ${ARTICLE[reply.captured]} en ${reply.to} sans protection : ${reply.san} le prend`;
+    else if (reply && reply.san.includes("#")) reason = `il permet ${reply.san}, qui fait mat`;
+    else if (reply && reply.san.includes("+")) reason = `il expose votre roi : ${reply.san} donne échec`;
+    else if (reply && reply.captured) reason = `il perd un pion : ${reply.san}`;
+    else if (reply && after) {
+      // the answer creates threats: pieces of ours that become hanging after it
+      try {
+        const c = new Chess(ctx.fens[ply + 1]);
+        c.move(reply.san);
+        const was = hanging(after, side);
+        const hit = [...hanging(c, side)].filter((sq) => !was.has(sq)).map((sq) => c.get(sq).type);
+        if (hit.length) reason = `il permet ${reply.san}, qui attaque ${listFr(hit)}${hit.length > 1 ? " en même temps" : ""}`;
+      } catch { /* none */ }
+    }
+    const cost = ` (−${(g.loss || 0).toFixed(1)} % de chances de gain)`;
+    const better = bestMv ? ` ${bestMv.san} était plus fort, car il ${whatItDoes(bestMv, side)}.` : "";
+    return (reason ? `Mauvais coup, car ${reason}${cost}.` : `Coup imprécis${cost}.`) + better;
+  }
+
+  const out = [];
+  if (m.captured) {
+    const safe = !after || !after.attackers(m.to, side === "w" ? "b" : "w").length;
+    out.push(`il prend ${ARTICLE[m.captured]}${safe ? " sans risque de reprise" : ""}`);
+  }
+  if (before && after) {
+    // a piece that was in danger is now safe
+    const was = hanging(before, side), now = hanging(after, side);
+    const saved = [...was].filter((sq) => !now.has(sq) && sq !== m.from);
+    if (was.has(m.from) && !now.has(m.to)) out.push(`il met ${ARTICLE[m.piece]} à l'abri`);
+    else if (saved.length) out.push(`il protège ${ARTICLE[before.get(saved[0]).type]} en ${saved[0]}, qui était menacé`);
+    // a new threat on an enemy piece
+    const opp = side === "w" ? "b" : "w";
+    const threat = [...hanging(after, opp)].filter((sq) => !hanging(before, opp).has(sq));
+    if (threat.length) out.push(`il menace ${ARTICLE[after.get(threat[0]).type]} en ${threat[0]}`);
+  }
+  if (m.san.includes("#")) out.push("il fait mat");
+  else if (m.san.includes("+")) out.push("il donne échec et force la réponse");
+  if (m.flags.includes("k") || m.flags.includes("q")) out.push("il met le roi à l'abri et active la tour");
+  else if (START[side][m.from] === m.piece && !m.captured) out.push(`il développe ${ARTICLE[m.piece]} vers le centre`);
+  else if (CENTRE.has(m.to) && !m.captured) out.push("il occupe le centre");
+  if (!out.length) out.push("il garde l'équilibre sans créer de faiblesse");
+  const best = g.isEngineBest || g.cat === "best" || g.cat === "great" || g.cat === "brilliant";
+  return (best ? "Excellent coup, car " : "Bon coup, car ") + out.join(", ") + ".";
+}
 function explainMove(g, ctx, bestMv) {
   const m = g.move, side = m.color, ply = ctx.ply;
   const who = side === "w" ? "Les Blancs" : "Les Noirs";
@@ -203,12 +291,9 @@ function explainMove(g, ctx, bestMv) {
   } catch { /* none */ }
   let text = bits.join(", ") + ".";
   if (hits.length) text += ` ${P[0].toUpperCase() + P.slice(1)} en ${m.to} attaque maintenant ${listFr(hits)}.`;
-  if (g.loss > 1) text += ` Ce coup coûte ${g.loss.toFixed(1)} % de chances de gain.`;
 
-  // the engine's view and the expected answer
-  const how = [];
-  if (g.isEngineBest || g.cat === "best") how.push("C'était le premier choix du moteur.");
-  else if (bestMv) how.push(`Le moteur préférait ${bestMv.san}.`);
+  // why it is good or bad, then the expected answer
+  const how = [whyMove(g, ctx, bestMv)];
   const reply = g.after && g.after.lines && g.after.lines[0] && g.after.lines[0].pv[0];
   if (reply) {
     try {
@@ -216,10 +301,9 @@ function explainMove(g, ctx, bestMv) {
       how.push(`Réponse attendue : ${r.san}${r.captured ? `, qui prend ${ARTICLE[r.captured]}` : ""}.`);
     } catch { /* keep */ }
   }
-  if (!how.length) how.push("Avant le prochain coup, demandez-vous ce que l'adversaire menace.");
   const bad = ["inaccuracy", "mistake", "miss", "blunder"].includes(g.cat);
   return { id: "explain-" + ply, cat: bad ? "plan" : g.cat === "book" ? "dev" : "praise", icon: "🔎",
-    title: "Ce que fait " + m.san, text, how: how.join(" ") };
+    title: "Ce que fait " + m.san, text, how: how.join(" "), howLabel: "Pourquoi : " };
 }
 
 export function coachTip(g, ctx) {
@@ -479,7 +563,7 @@ export function coachTip(g, ctx) {
   // a pawn break was the plan, a piece move was played
   if ((g.cat === "inaccuracy" || g.cat === "mistake") && bestMv && bestMv.piece === "p" && !bestMv.captured && m.piece !== "p" && !opening)
     add("pawn-break", 54, "plan", "♟️", "Préparez la poussée",
-      `Le moteur préférait ${bestMv.san} : une poussée de pion qui gagne de l'espace avant d'attaquer.`,
+      `${bestMv.san} était plus fort : une poussée de pion qui gagne de l'espace avant d'attaquer.`,
       "Avant d'amener vos pièces à l'attaque, ouvrez des lignes avec un pion : elles auront ensuite des cibles.");
 
   // one move held everything and another one was played
@@ -509,7 +593,8 @@ export function coachTip(g, ctx) {
   // something important always speaks; otherwise prefer a card not seen on the last moves,
   // and when nothing specific applies, explain the move itself
   const pick = tips.find((t) => !avoid.has(t.id) || t.p >= 90) || explainMove(g, ctx, bestMv);
-  const { id, cat, icon, title, text, how } = pick;
-  return { id, cat, label: TIP_CATS[cat], icon, title, text, how };
+  const { id, cat, icon, title, text, how, howLabel } = pick;
+  return { id, cat, label: TIP_CATS[cat], icon, title, text, how, howLabel,
+    why: id.startsWith("explain-") ? null : whyMove(g, ctx, bestMv) };
 }
 

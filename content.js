@@ -135,8 +135,9 @@
   }
   // Arrows laid over the board in one SVG, square centres computed from the board box:
   // cyan = the engine's move where the move played fell short, amber = your move to play,
-  // red = the opponent's expected move, green = your premove answer to it.
-  const ARROWS = { best: "#22d3ee", next: "#fbbf24", opp: "#f87171", pre: "#4ade80" };
+  // red = the opponent's expected move, green = your premove answer to it, dashed violet =
+  // the engine's deepest move when it differs from the human one.
+  const ARROWS = { best: "#22d3ee", next: "#fbbf24", opp: "#f87171", pre: "#4ade80", deep: "#e879f9" };
   let arrow = null;
   function positionArrow() {
     const board = findBoard();
@@ -151,7 +152,7 @@
         `<marker id="movegrade-head-${k}" viewBox="0 0 4 4" refX="2" refY="2" markerWidth="2.6" markerHeight="2.6" orient="auto">` +
         `<path d="M0,0 L4,2 L0,4 z" fill="${c}"/></marker>`).join("") + "</defs>" +
         Object.entries(ARROWS).map(([k, c]) =>
-          `<line data-k="${k}" stroke="${c}" stroke-width="0.16" stroke-linecap="round" marker-end="url(#movegrade-head-${k})"/>`).join("");
+          `<line data-k="${k}" stroke="${c}" stroke-width="0.16" stroke-linecap="round"${k === "deep" ? ' stroke-dasharray="0.3 0.2"' : ""} marker-end="url(#movegrade-head-${k})"/>`).join("");
       Object.assign(arrow.style, { position: "fixed", zIndex: "2147483645", pointerEvents: "none", opacity: "0.82",
         filter: "drop-shadow(0 0 3px rgba(0,0,0,0.6))" });
       document.documentElement.appendChild(arrow);
