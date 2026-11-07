@@ -19,7 +19,8 @@
   if (window.__movegradeLoaded) return;
   window.__movegradeLoaded = true;
 
-  const SITE = /chess\.com$/.test(location.hostname) ? "chesscom" : "lichess";
+  // juliensong.com's bot page uses the lichess board (chessground), so it shares lichess' board code
+  const SITE = /chess\.com$/.test(location.hostname) ? "chesscom" : /juliensong\.com$/.test(location.hostname) ? "juliensong" : "lichess";
   const SAN_RE = /^(?:[NBRQK][a-h]?[1-8]?x?[a-h][1-8]|[a-h]x?[a-h]?[1-8](?:=[NBRQ])?|O-O(?:-O)?)[+#]?$/;
   const VARIATION_SEL = "interrupt, line, lines, comment, .variation, .sub-line, .sub-variation, .variation-component";
   const ACTIVE_SEL = ".a1t, .active, .selected, .current, .node-highlight-content.selected";
@@ -84,7 +85,7 @@
     calc.right = calc.left + sq;
     calc.bottom = calc.top + sq;
 
-    if (SITE === "lichess") {
+    if (SITE !== "chesscom") {
       // lichess draws <square class="last-move"> under both squares of the last
       // move; snap to whichever one our computed square overlaps.
       let best = null, bestDist = Infinity;
@@ -282,7 +283,12 @@
     return { mode: "round", allowed: false, reason: PAUSED_UNKNOWN, root, live: false };
   }
 
-  function detectBase() { return SITE === "chesscom" ? detectChesscom() : detectLichess(); }
+  // juliensong.com: games against Julien's bots only, so always allowed
+  function detectJulien() {
+    const b = document.querySelector("cg-board");
+    return b ? { mode: "analysis", allowed: true, reason: "", root: b, mine: true } : { mode: "none", allowed: false, reason: "" };
+  }
+  function detectBase() { return SITE === "chesscom" ? detectChesscom() : SITE === "juliensong" ? detectJulien() : detectLichess(); }
 
   function detectContext() {
     const ctx = detectBase();
@@ -348,6 +354,39 @@
       }
     }
     return candidates.filter((el) => best.contains(el));
+  }
+
+  // juliensong.com shows no move list: read the piece placement off the board instead and
+  // let the panel turn the successive positions into moves.
+  const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+  let julienBoards = [];
+  function boardPlacement() {
+    const b = findBoard();
+    if (!b) return null;
+    const sq = b.el.clientWidth / 8;
+    if (sq < 5) return null;
+    const grid = Array.from({ length: 8 }, () => Array(8).fill(""));
+    for (const p of b.el.querySelectorAll("piece")) {
+      // a piece moving or being dragged is between squares: wait for it to land
+      if (/\b(anim|dragging|ghost|fading)\b/.test(p.className)) return null;
+      const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(p.style.transform || "");
+      if (!m) continue;
+      const col = Math.round(+m[1] / sq), row = Math.round(+m[2] / sq);
+      if (col < 0 || col > 7 || row < 0 || row > 7) continue;
+      const [color, role] = p.className.split(/\s+/);
+      const letter = { pawn: "p", knight: "n", bishop: "b", rook: "r", queen: "q", king: "k" }[role];
+      if (!letter) continue;
+      const r = b.flipped ? 7 - row : row, f = b.flipped ? 7 - col : col;
+      grid[r][f] = color === "white" ? letter.toUpperCase() : letter;
+    }
+    return grid.map((row) => row.map((c) => c || "1").join("").replace(/1+/g, (s) => s.length)).join("/");
+  }
+  function julienHistory() {
+    const now = boardPlacement();
+    if (!now) return julienBoards;
+    if (now === START) julienBoards = [START];
+    else if (julienBoards[julienBoards.length - 1] !== now) julienBoards = [...julienBoards, now];
+    return julienBoards;
   }
 
   function scrapeMoves(ctx) {
@@ -431,11 +470,14 @@
       if (idle !== lastPayload) { lastPayload = idle; post({ type: "movegrade:moves", ...JSON.parse(idle) }); }
       return;
     }
-    let sans = [];
-    try { sans = ctx.allowed ? scrapeMoves(ctx) : []; } catch (e) { console.warn("[Mentor64] scrape failed", e); }
+    let sans = [], boards;
+    try {
+      if (ctx.allowed && SITE === "juliensong") boards = julienHistory();
+      else sans = ctx.allowed ? scrapeMoves(ctx) : [];
+    } catch (e) { console.warn("[Mentor64] scrape failed", e); }
     const board = findBoard();
     const flipped = !!(board && board.flipped);
-    const payload = JSON.stringify({ mode: ctx.mode, allowed: ctx.allowed, reason: ctx.reason, sans, flipped, mine: !!ctx.mine });
+    const payload = JSON.stringify({ mode: ctx.mode, allowed: ctx.allowed, reason: ctx.reason, sans, boards, flipped, mine: !!ctx.mine });
     if (payload === lastPayload) return;
     lastPayload = payload;
     post({ type: "movegrade:moves", ...JSON.parse(payload) });
@@ -475,7 +517,7 @@
         "#board-layout-player-top .clock-component, .clock-top .clock-time-monospace"],
       board: "#board-single, wc-chess-board, chess-board",
     },
-  }[SITE];
+  }[SITE === "chesscom" ? "chesscom" : "lichess"];
 
   let liveStyle = null, revealBtn = null;
   function applyLiveCss() {
@@ -579,8 +621,8 @@
   async function togglePip() {
     if (pip) { pip.close(); return "Fenêtre fermée"; }
     if (!("documentPictureInPicture" in window)) return "Non disponible dans ce navigateur";
-    const el = SITE === "lichess"
-      ? document.querySelector(".round__app__board, .analyse__board, .main-board")
+    const el = SITE !== "chesscom"
+      ? document.querySelector(".round__app__board, .analyse__board, .main-board, .cg-wrap")
       : (document.querySelector("#board-layout-player-top") || {}).parentElement || document.querySelector(LIVE_SEL.board);
     if (!el) return "Aucun échiquier sur cette page";
     const r = el.getBoundingClientRect();
@@ -652,5 +694,6 @@
 
   update();
   // SPA navigations (both sites) don't reload the page.
-  setInterval(update, 2000);
+  // juliensong.com moves pieces by changing their style only, which the observer does not watch
+  setInterval(update, SITE === "juliensong" ? 400 : 2000);
 })();

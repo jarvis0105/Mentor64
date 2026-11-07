@@ -941,6 +941,31 @@ function renderProfile() {
 }
 const PIECE_NAMES = { n: "Cavaliers", b: "Fous", r: "Tours", q: "Dame" };
 
+// ----------------------------------------------------------------- positions -> moves
+// juliensong.com only gives successive piece placements: find the legal move (or two, when
+// the bot answered between two reads) that leads from one to the next. Placements that match
+// nothing (a half-drawn board) are skipped.
+// shortcut: a game joined mid-way (first placement not the start) yields no moves; fine for a bot page.
+function boardsToSans(boards) {
+  const c = new Chess();
+  const place = () => c.fen().split(" ")[0];
+  const play = (m) => c.move({ from: m.from, to: m.to, promotion: m.promotion });
+  const leadsTo = (m, b) => { play(m); const ok = place() === b; c.undo(); return ok; };
+  const out = [];
+  for (const b of boards) {
+    if (b === place()) continue;
+    const one = c.moves({ verbose: true }).find((m) => leadsTo(m, b));
+    if (one) { out.push(play(one).san); continue; }
+    for (const m of c.moves({ verbose: true })) {
+      play(m);
+      const two = c.moves({ verbose: true }).find((r) => leadsTo(r, b));
+      c.undo();
+      if (two) { out.push(play(m).san, play(two).san); break; }
+    }
+  }
+  return out;
+}
+
 // ----------------------------------------------------------------- messages
 window.addEventListener("message", (ev) => {
   const d = ev.data;
@@ -954,7 +979,7 @@ window.addEventListener("message", (ev) => {
   pageMine = !!d.mine;
   if (orientationChanged) tipLog.clear();
   const prevSans = sans;
-  const complete = rebuild(d.sans || []);
+  const complete = rebuild(d.boards ? boardsToSans(d.boards) : d.sans || []);
   // another game (not a step forward or back in this one): forget which cards were shown
   if (sans.slice(0, prevSans.length).join() !== prevSans.slice(0, sans.length).join()) {
     tipLog.clear();

@@ -1,18 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Mentor64",
-  "version": "1.9.0",
-  "description": "Coach d'échecs sur lichess et chess.com : note de chaque coup, conseils concrets, fiche de partie et profil de joueur.",
+  "version": "1.10.0",
+  "description": "Coach d'échecs sur lichess, chess.com et les bots de juliensong.com : note de chaque coup, conseils concrets, fiche de partie et profil de joueur.",
   "permissions": ["storage", "offscreen"],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
-  "host_permissions": ["https://lichess.org/*", "https://www.chess.com/*"],
+  "host_permissions": ["https://lichess.org/*", "https://www.chess.com/*", "https://www.juliensong.com/*"],
   "background": { "service_worker": "background.js" },
   "action": { "default_title": "Mentor64 : afficher / masquer le panneau" },
   "content_scripts": [
     {
-      "matches": ["https://lichess.org/*", "https://www.chess.com/*"],
+      "matches": ["https://lichess.org/*", "https://www.chess.com/*", "https://www.juliensong.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     },
@@ -32,7 +32,7 @@
   "web_accessible_resources": [
     {
       "resources": ["overlay/*", "engine/*", "lib/*"],
-      "matches": ["https://lichess.org/*", "https://www.chess.com/*"]
+      "matches": ["https://lichess.org/*", "https://www.chess.com/*", "https://www.juliensong.com/*"]
     }
   ],
   "icons": { "128": "icons/icon128.png" }
