@@ -224,6 +224,8 @@ const OBJECTIVES = {
 
 /** Aggregate the stored games into the profile shown in the "Profil" tab. */
 export function buildProfile(records) {
+  // the level is measured on games against people only: bots play too differently
+  records = records.filter((r) => !r.bot);
   if (!records.length) return null;
   const n = records.length;
 

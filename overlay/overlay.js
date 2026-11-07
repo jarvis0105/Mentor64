@@ -554,7 +554,14 @@ function renderCoach(g) {
   how.append(h("b", null, tip.howLabel || "Pour progresser : "), tip.how);
   const parts = [h("div", "kicker neon", tip.label), head, h("div", "ctext", tip.text)];
   if (tip.why) { const why = h("div", "chow"); why.append(h("b", null, "Pourquoi : "), tip.why); parts.push(why); }
-  box.replaceChildren(...parts, how);
+  parts.push(how);
+  // what the move shows, explained (fork, recapture, outpost...): the two that matter most
+  for (const k of themesOf(g).slice(0, 2)) {
+    const t = h("div", "chow");
+    t.append(h("b", null, "🏷 " + THEMES[k][0] + " : "), THEMES[k][1]);
+    parts.push(t);
+  }
+  box.replaceChildren(...parts);
 }
 
 // ----------------------------------------------------------------- summary table + accuracy
@@ -669,26 +676,24 @@ function renderPrinciples(name) {
   box.replaceChildren(h("summary", null, "📖 Principes : " + p.title), h("div", "ctext", p.idea), ul);
 }
 
-/** What the move shows (fork, development, recapture…), as chips; a click explains the theme. */
-function renderThemes(g) {
-  const el = $("themes"), def = $("themedef");
-  def.textContent = "";
-  if (!g || !g.move || !settings.coach) { el.replaceChildren(); return; }
+// Most telling first: a mate or a tactic says more than "capture" or "pawn in the centre".
+const THEME_ORDER = ["backRankMate", "queenMate", "rookMate", "mate", "brilliantSac", "queenSac", "royalFork", "knightFork",
+  "fork", "doubleCheck", "discoveredCheck", "absolutePin", "pin", "defendsMate", "freePiece", "winningCapture", "promotion",
+  "outpost", "rooksSeventh", "rookSeventh", "rookBehindPassed", "rookBlocksPassed", "makesPassed", "protectedPassed",
+  "pushesPassed", "opposition", "activatesKing", "completesDev", "connectsRooks", "castles", "fianchetto", "strikeCenter",
+  "kick", "recapture", "equalTrade", "defends", "blocks", "retreat", "rookOpenFile", "dev", "centerPawn", "check",
+  "capture", "book", "pawnEnding", "rookEnding", "queenEnding", "minorEnding"];
+/** The move's themes, most telling first. */
+function themesOf(g) {
+  if (!g || !g.move) return [];
   let prev = null;
   try { if (g.ply > 0) prev = new Chess(fens[g.ply - 1]).move(sans[g.ply - 1]); } catch { /* none */ }
+  const rank = (k) => { const i = THEME_ORDER.indexOf(k); return i < 0 ? 99 : i; };
   const keys = moveThemes(fens[g.ply], fens[g.ply + 1], g.move, prev, g.cat);
-  el.replaceChildren(...keys.map((k) => {
-    const b = h("button", null, THEMES[k][0]);
-    b.title = THEMES[k][1];
-    b.addEventListener("click", () => {
-      const on = !b.classList.contains("on");
-      for (const x of el.children) x.classList.remove("on");
-      b.classList.toggle("on", on);
-      def.textContent = on ? THEMES[k][1] : "";
-      reportLayout();
-    });
-    return b;
-  }));
+  // the specific theme says it all: "knight fork" makes "fork" redundant
+  const covered = { fork: ["knightFork", "royalFork"], mate: ["backRankMate", "queenMate", "rookMate"], rookSeventh: ["rooksSeventh"],
+    capture: ["winningCapture", "freePiece", "recapture", "equalTrade"], pin: ["absolutePin"] };
+  return keys.filter((k) => !(covered[k] || []).some((x) => keys.includes(x))).sort((x, y) => rank(x) - rank(y));
 }
 
 /** Known openings your side can still follow, with your next move, for the first moves. */
@@ -706,13 +711,6 @@ function renderOpenings() {
       d.append(h("div", "ctext", o.idea));
       return d;
     }));
-}
-
-// the glossary is static: build it once
-{
-  const dl = h("dl");
-  for (const [name, text] of Object.values(THEMES)) dl.append(h("dt", null, name), h("dd", null, text));
-  $("glossary").append(dl);
 }
 
 function renderGrade(g) {
@@ -737,7 +735,6 @@ function renderGrade(g) {
     els.bestline.textContent = "";
   }
   renderNext(g);
-  renderThemes(g);
   // the on-board badge only ever shows the latest move
   renderCoach(g);
   if (g.ply === sans.length - 1) postGrade(g);
@@ -757,7 +754,6 @@ function renderCurrent() {
     els.evalAfter.textContent = "·";
     els.detail.textContent = "";
     els.bestline.textContent = "";
-    renderThemes(null);
     renderCoach(null);
   }
   renderOpenings();
@@ -772,7 +768,6 @@ function showIdle(text, status) {
   els.detail.textContent = "";
   els.bestline.textContent = "";
   renderCoach(null);
-  renderThemes(null);
   renderPrinciples(null);
   renderOpenings();
   renderSummary();
@@ -796,7 +791,7 @@ const sheetSide = () => sheetPick || (flipped ? "b" : "w");
 // Only the user's own games go into the profile: a game against the computer (the page says
 // so), one the user marked with "C'est ma partie", or one already stored. `claim` is the
 // user's explicit answer for this game (a side, or null for "not mine"); undefined = not asked.
-let claim, pageMine = false;
+let claim, pageMine = false, pageBot = false;
 const isThisGame = (r) => { const cur = sans.join(" "); return r.moves.startsWith(cur) || cur.startsWith(r.moves); };
 function mineSide() {
   if (claim !== undefined) return claim;
@@ -819,6 +814,7 @@ function saveGame() {
   const sheet = analyseGame({ fens, sans, grades }, side);
   if (!sheet) return;
   const rec = gameRecord(sheet, sans);
+  if (pageBot) rec.bot = true;
   const key = rec.side + rec.moves + Math.round(rec.acc);
   if (key === lastSaved) return;
   lastSaved = key;
@@ -932,8 +928,8 @@ function renderProfile() {
   const p = buildProfile(records);
   if (!p) {
     els.profile.replaceChildren(h("div", "empty",
-      "Votre profil se construit à partir de vos parties (16 demi-coups minimum). Les parties contre l'ordinateur " +
-      "sont ajoutées d'elles-mêmes ; pour les autres, ouvrez la fiche de partie et cliquez « C'est ma partie »."));
+      "Votre profil se construit à partir de vos parties contre des personnes (16 demi-coups minimum) : " +
+      "les parties contre les bots n'y comptent pas. Ouvrez la fiche d'une partie terminée et cliquez « C'est ma partie »."));
     reportLayout();
     return;
   }
@@ -1030,6 +1026,7 @@ window.addEventListener("message", (ev) => {
   const orientationChanged = !!d.flipped !== flipped;
   flipped = !!d.flipped;
   pageMine = !!d.mine;
+  pageBot = !!d.bot;
   if (orientationChanged) tipLog.clear();
   const prevSans = sans;
   const complete = rebuild(d.boards ? boardsToSans(d.boards) : d.sans || []);

@@ -216,20 +216,11 @@ button:focus-visible, input:focus-visible + .toggle-slider { outline: 2px solid 
 #principles .ctext { color: var(--text-soft); }
 #principles ul { margin: var(--s2) 0 0; padding-left: 18px; font-size: 11.5px; line-height: 1.45; user-select: text; }
 #principles li + li { margin-top: 3px; }
-#themes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-#themes button { font: inherit; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid #3b9dff66;
-  background: #3b9dff1a; color: var(--text); cursor: pointer; }
-#themes button.on { background: #3b9dff55; }
-#themedef { color: var(--text-soft); font-size: 11px; margin-top: 3px; }
-#themedef:empty { display: none; }
 #openings .kicker { margin-bottom: 4px; }
 #openings .op + .op { margin-top: 6px; }
 #openings .op b { color: #fbbf24; }
 #openings .ctext { font-size: 11px; color: var(--text-soft); }
-#glossary summary { font-size: 12px; font-weight: 700; }
-#glossary dl { margin: var(--s2) 0 0; font-size: 11px; line-height: 1.4; user-select: text; }
-#glossary dt { font-weight: 700; margin-top: 5px; }
-#glossary dd { margin: 0; color: var(--text-soft); }
+
 
 /* ---------------------------------------------------------------- sheet & profile */
 .empty { padding: var(--s4); text-align: center; color: var(--text-soft); font-size: 12px; line-height: 1.5; }

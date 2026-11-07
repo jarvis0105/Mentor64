@@ -196,7 +196,7 @@
       if (playing && !finished && !vsEngine) {
         return { mode: "round", allowed: false, reason: PAUSED_LIVE, root: round, live: true };
       }
-      return { mode: "round", allowed: true, reason: "", root: round, mine: vsEngine };
+      return { mode: "round", allowed: true, reason: "", root: round, mine: vsEngine, bot: vsEngine };
     }
     if (analyse) return { mode: "analysis", allowed: true, reason: "", root: analyse.closest("main") || analyse.parentElement || analyse };
     return { mode: "none", allowed: false, reason: "" };
@@ -260,6 +260,8 @@
       document.body;
 
     const vsComputer = /^\/play\/computer/.test(path);
+    // a game against a bot, being played or reviewed (chess.com puts "computer" in those paths)
+    const bot = vsComputer || /\/computer(\/|$)/.test(path);
     // Resign/draw/abort controls only exist for a participant in a running game.
     const participant = !!document.querySelector(
       ".resign-button-component, button[aria-label='Resign'], button[aria-label='Abort'], [data-cy='resign'], " +
@@ -273,12 +275,12 @@
     const liveHuman = participant && !finished && !vsComputer;
 
     if (liveHuman) return { mode: "round", allowed: false, reason: PAUSED_LIVE, root, live: true };
-    if (vsComputer) return { mode: "round", allowed: true, reason: "", root, live: false, mine: true };
+    if (vsComputer) return { mode: "round", allowed: true, reason: "", root, live: false, mine: true, bot: true };
     if (analysisRoute || broadcastRoute) {
-      return { mode: "analysis", allowed: true, reason: "", root, live: false };
+      return { mode: "analysis", allowed: true, reason: "", root, live: false, bot };
     }
     // Game pages (live or daily, mine or spectated): only once positively finished.
-    if (finished) return { mode: "round", allowed: true, reason: "", root, live: false };
+    if (finished) return { mode: "round", allowed: true, reason: "", root, live: false, bot };
     // Anything else showing a board (in-progress game, puzzles, unknown page): paused.
     return { mode: "round", allowed: false, reason: PAUSED_UNKNOWN, root, live: false };
   }
@@ -286,7 +288,7 @@
   // juliensong.com: games against Julien's bots only, so always allowed
   function detectJulien() {
     const b = document.querySelector("cg-board");
-    return b ? { mode: "analysis", allowed: true, reason: "", root: b, mine: true } : { mode: "none", allowed: false, reason: "" };
+    return b ? { mode: "analysis", allowed: true, reason: "", root: b, mine: true, bot: true } : { mode: "none", allowed: false, reason: "" };
   }
   function detectBase() { return SITE === "chesscom" ? detectChesscom() : SITE === "juliensong" ? detectJulien() : detectLichess(); }
 
@@ -477,7 +479,7 @@
     } catch (e) { console.warn("[Mentor64] scrape failed", e); }
     const board = findBoard();
     const flipped = !!(board && board.flipped);
-    const payload = JSON.stringify({ mode: ctx.mode, allowed: ctx.allowed, reason: ctx.reason, sans, boards, flipped, mine: !!ctx.mine });
+    const payload = JSON.stringify({ mode: ctx.mode, allowed: ctx.allowed, reason: ctx.reason, sans, boards, flipped, mine: !!ctx.mine, bot: !!ctx.bot });
     if (payload === lastPayload) return;
     lastPayload = payload;
     post({ type: "movegrade:moves", ...JSON.parse(payload) });
