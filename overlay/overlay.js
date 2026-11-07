@@ -33,7 +33,7 @@ const assetUrl = (p) => (isExt ? chrome.runtime.getURL(p) : new URL("../" + p, l
 const LIVE_TOGGLES = { lvRatings: false, lvAnon: false, lvLowTime: true, lvGlow: true, lvGlowFull: true,
   // chesscom-extras.js, same keys and defaults as there
   lvArrows: true, lvClutter: true, lvLifetime: true, lvFriends: false };
-const settings = { thinkMs: 1000, coach: true, arrow: true, nextArrow: true, oppArrow: true, engine: DEFAULT_ENGINE, ...LIVE_TOGGLES };
+const settings = { thinkMs: 1000, level: 3, coach: true, arrow: true, nextArrow: true, oppArrow: true, engine: DEFAULT_ENGINE, ...LIVE_TOGGLES };
 
 // French display labels (chess.com wording); classify.js keeps the English keys.
 const FR = {
@@ -53,6 +53,8 @@ function applySettingsToUi() {
   els.coachOn.checked = settings.coach;
   els.arrowOn.checked = settings.arrow;
   $("nextOn").checked = settings.nextArrow;
+  $("level").value = settings.level;
+  $("levelVal").textContent = levelText(settings.level);
   $("oppOn").checked = settings.oppArrow;
   for (const k in LIVE_TOGGLES) $(k).checked = settings[k];
 }
@@ -72,6 +74,18 @@ function saveSetting(k, v) {
 els.think.addEventListener("input", () => { saveSetting("thinkMs", +els.think.value); els.thinkVal.textContent = fmtSecs(settings.thinkMs); });
 els.coachOn.addEventListener("change", () => { saveSetting("coach", els.coachOn.checked); renderCurrent(); });
 els.arrowOn.addEventListener("change", () => { saveSetting("arrow", els.arrowOn.checked); renderCurrent(); });
+$("level").addEventListener("input", async () => {
+  saveSetting("level", +$("level").value);
+  $("levelVal").textContent = levelText(settings.level);
+  // redo the arrows of the latest position at the new level
+  humanPv.clear();
+  const last = sans.length - 1, g = grades[last], gen = generation;
+  if (!g || g.after.terminal) return;
+  await humanLine(fens[last + 1], gen);
+  if (gen !== generation || last !== sans.length - 1) return;
+  if (selected < 0 || selected === last) renderNext(g);
+  postGrade(g);
+});
 $("nextOn").addEventListener("change", () => { saveSetting("nextArrow", $("nextOn").checked); renderCurrent(); });
 $("oppOn").addEventListener("change", () => { saveSetting("oppArrow", $("oppOn").checked); renderCurrent(); });
 for (const k in LIVE_TOGGLES) $(k).addEventListener("change", () => saveSetting(k, $(k).checked));
@@ -146,16 +160,19 @@ function bestArrow(g) {
 
 // Play arrows, drawn before the move is played: your move when it is your turn; when it is the
 // opponent's, their expected move and your premove answer. They come from a shallow search
-// (depth 3 to 5, a club player's look-ahead) so they show natural moves, not the engine's
+// (depth 1 to 5, chosen with the "Niveau des flèches" slider) so they show natural moves, not the engine's
 // deepest line. Grading never runs during a live game against a person (content.js pauses
 // it), so none of this shows there.
 const humanPv = new Map(); // fen -> pv of the shallow search
+// shortcut: Elo figures are rough club-level estimates for each search depth, not a calibration.
+const LEVEL_ELO = [0, 800, 1100, 1400, 1700, 2000];
+const levelText = (d) => `≈ ${LEVEL_ELO[d]} Elo (prof. ${d})`;
 async function humanLine(fen, gen) {
   if (humanPv.has(fen)) return humanPv.get(fen);
   await engineChosen;
   const e = engine;
   try { await e.readyPromise; } catch { return null; }
-  const r = await e.analyse(fen, 2000, null, 3 + Math.floor(Math.random() * 3));
+  const r = await e.analyse(fen, 2000, null, Math.min(5, Math.max(1, settings.level || 3)));
   if (gen !== generation || !r || !r.lines.length) return null;
   humanPv.set(fen, r.lines[0].pv);
   return r.lines[0].pv;

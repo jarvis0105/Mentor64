@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Mentor64",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Coach d'échecs sur lichess et chess.com : note de chaque coup, conseils concrets, fiche de partie et profil de joueur.",
   "permissions": ["storage", "offscreen"],
   "content_security_policy": {
