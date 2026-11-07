@@ -6,6 +6,8 @@ import { classify, CATEGORIES, fmtEval, lineToCp, winPct } from "./classify.js";
 import { lookupOpening } from "./book.js";
 import { coachTip } from "./coach.js";
 import { principlesFor } from "./principles.js";
+import { THEMES, moveThemes } from "./themes.js";
+import { openingSuggestions } from "./openings.js";
 import { analyseGame, gameRecord, upsertRecord, buildProfile, moveAccuracy, verdict } from "./profile.js";
 
 const $ = (id) => document.getElementById(id);
@@ -667,6 +669,52 @@ function renderPrinciples(name) {
   box.replaceChildren(h("summary", null, "📖 Principes : " + p.title), h("div", "ctext", p.idea), ul);
 }
 
+/** What the move shows (fork, development, recapture…), as chips; a click explains the theme. */
+function renderThemes(g) {
+  const el = $("themes"), def = $("themedef");
+  def.textContent = "";
+  if (!g || !g.move || !settings.coach) { el.replaceChildren(); return; }
+  let prev = null;
+  try { if (g.ply > 0) prev = new Chess(fens[g.ply - 1]).move(sans[g.ply - 1]); } catch { /* none */ }
+  const keys = moveThemes(fens[g.ply], fens[g.ply + 1], g.move, prev, g.cat);
+  el.replaceChildren(...keys.map((k) => {
+    const b = h("button", null, THEMES[k][0]);
+    b.title = THEMES[k][1];
+    b.addEventListener("click", () => {
+      const on = !b.classList.contains("on");
+      for (const x of el.children) x.classList.remove("on");
+      b.classList.toggle("on", on);
+      def.textContent = on ? THEMES[k][1] : "";
+      reportLayout();
+    });
+    return b;
+  }));
+}
+
+/** Known openings your side can still follow, with your next move, for the first moves. */
+function renderOpenings() {
+  const box = $("openings");
+  const side = mineSide() || (flipped ? "b" : "w");
+  const list = settings.coach && !paused && sans.length < 16 ? openingSuggestions(sans, side) : [];
+  if (!list.length) { box.hidden = true; return; }
+  box.hidden = false;
+  box.replaceChildren(h("div", "kicker neon", `🎯 Ouvertures à suivre (${side === "w" ? "Blancs" : "Noirs"})`),
+    ...list.map((o) => {
+      const d = h("div", "op");
+      d.append(h("div", null, o.name + (o.next ? " · prochain coup : " : "")));
+      if (o.next) d.firstChild.append(h("b", null, o.next));
+      d.append(h("div", "ctext", o.idea));
+      return d;
+    }));
+}
+
+// the glossary is static: build it once
+{
+  const dl = h("dl");
+  for (const [name, text] of Object.values(THEMES)) dl.append(h("dt", null, name), h("dd", null, text));
+  $("glossary").append(dl);
+}
+
 function renderGrade(g) {
   setCat(g.cat);
   const white = g.ply % 2 === 0;
@@ -689,6 +737,7 @@ function renderGrade(g) {
     els.bestline.textContent = "";
   }
   renderNext(g);
+  renderThemes(g);
   // the on-board badge only ever shows the latest move
   renderCoach(g);
   if (g.ply === sans.length - 1) postGrade(g);
@@ -708,8 +757,10 @@ function renderCurrent() {
     els.evalAfter.textContent = "·";
     els.detail.textContent = "";
     els.bestline.textContent = "";
+    renderThemes(null);
     renderCoach(null);
   }
+  renderOpenings();
 }
 
 function showIdle(text, status) {
@@ -721,7 +772,9 @@ function showIdle(text, status) {
   els.detail.textContent = "";
   els.bestline.textContent = "";
   renderCoach(null);
+  renderThemes(null);
   renderPrinciples(null);
+  renderOpenings();
   renderSummary();
   setStatus(status);
   postGrade(null);

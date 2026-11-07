@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Mentor64",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Coach d'échecs sur lichess, chess.com et les bots de juliensong.com : note de chaque coup, conseils concrets, fiche de partie et profil de joueur.",
   "permissions": ["storage", "offscreen"],
   "content_security_policy": {

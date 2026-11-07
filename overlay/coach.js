@@ -13,8 +13,8 @@
 import { Chess } from "../lib/chess.js";
 import { lineToCp, winPct } from "./classify.js";
 
-const VAL = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-const START = { w: { b1: "n", g1: "n", c1: "b", f1: "b" }, b: { b8: "n", g8: "n", c8: "b", f8: "b" } };
+export const VAL = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+export const START = { w: { b1: "n", g1: "n", c1: "b", f1: "b" }, b: { b8: "n", g8: "n", c8: "b", f8: "b" } };
 export const PIECE_FR = { p: "pion", n: "cavalier", b: "fou", r: "tour", q: "dame", k: "roi" };
 
 export const relRank = (sq, color) => (color === "w" ? +sq[1] : 9 - +sq[1]);
@@ -45,14 +45,14 @@ export function phaseOf(chess, ply) {
 }
 
 /** The same position with `side` to move (and no en passant), or null if chess.js refuses it. */
-function withTurn(fen, side) {
+export function withTurn(fen, side) {
   const parts = fen.split(" ");
   parts[1] = side;
   parts[3] = "-";
   try { return new Chess(parts.join(" ")); } catch { return null; }
 }
 
-function isPassed(chess, sq, color) {
+export function isPassed(chess, sq, color) {
   const f = "abcdefgh".indexOf(sq[0]);
   const r = relRank(sq, color);
   for (const p of pieces(chess)) {
@@ -64,7 +64,7 @@ function isPassed(chess, sq, color) {
 }
 
 /** Can no enemy pawn ever attack `sq`? (no enemy pawn on a neighbouring file still "above" it) */
-function pawnProof(chess, sq, color) {
+export function pawnProof(chess, sq, color) {
   const f = "abcdefgh".indexOf(sq[0]);
   const r = relRank(sq, color);
   for (const p of pieces(chess)) {
@@ -76,7 +76,7 @@ function pawnProof(chess, sq, color) {
 }
 
 /** Valuable enemy pieces the piece on `sq` attacks (side to move flipped to the mover). */
-function forkTargets(fenAfter, sq, side) {
+export function forkTargets(fenAfter, sq, side) {
   const c = withTurn(fenAfter, side);
   if (!c) return [];
   const opp = side === "w" ? "b" : "w";
