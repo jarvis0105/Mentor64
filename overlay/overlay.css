@@ -138,6 +138,8 @@ button:focus-visible, input:focus-visible + .toggle-slider { outline: 2px solid 
   transition: transform var(--ease), box-shadow var(--ease);
 }
 #launcher:hover, #launcher.open { transform: scale(1.05); box-shadow: 0 0 0 2px var(--neon), 0 0 24px #3b9dffaa, 0 8px 20px rgba(0, 0, 0, 0.55); }
+#launcher { touch-action: none; cursor: grab; }
+#launcher:active { cursor: grabbing; }
 #lglyph { font-size: 32px; line-height: 1; color: var(--cyan); text-shadow: 0 0 10px #22d3eeaa; font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", "Apple Symbols", serif; }
 .lbadge {
   position: absolute; top: -6px; right: -6px;

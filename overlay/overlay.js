@@ -130,7 +130,31 @@ function applyOpen() {
   reportLayout();
 }
 function setOpen(v) { open = v; storage.set({ panelOpen: open }); applyOpen(); }
-els.launcher.addEventListener("click", () => setOpen(!open));
+// The launcher can be dragged anywhere: the page moves the iframe, we only report the drag.
+// Screen coordinates stay valid while the iframe moves under the pointer.
+let drag = null, dragged = false;
+els.launcher.addEventListener("pointerdown", (e) => {
+  drag = { x: e.screenX, y: e.screenY, moved: false };
+  els.launcher.setPointerCapture(e.pointerId);
+});
+els.launcher.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = e.screenX - drag.x, dy = e.screenY - drag.y;
+  if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+  if (!drag.moved) parent.postMessage({ type: "movegrade:drag", phase: "start" }, "*");
+  drag.moved = true;
+  parent.postMessage({ type: "movegrade:drag", phase: "move", dx, dy }, "*");
+});
+const endDrag = () => {
+  if (drag && drag.moved) { dragged = true; parent.postMessage({ type: "movegrade:drag", phase: "end" }, "*"); }
+  drag = null;
+};
+els.launcher.addEventListener("pointerup", endDrag);
+els.launcher.addEventListener("pointercancel", endDrag);
+els.launcher.addEventListener("click", () => {
+  if (dragged) { dragged = false; return; } // the end of a drag is not a click
+  setOpen(!open);
+});
 $("close").addEventListener("click", () => setOpen(false));
 storage.get("panelOpen", (v) => { open = !!(v && v.panelOpen); applyOpen(); });
 window.addEventListener("message", (ev) => {
@@ -165,17 +189,29 @@ function bestArrow(g) {
 // it), so none of this shows there.
 const humanPv = new Map(); // fen -> pv of the shallow search
 // shortcut: Elo figures are rough club-level estimates for each search depth, not a calibration.
-const LEVEL_ELO = [0, 800, 1100, 1400, 1700, 2000];
+const LEVEL_ELO = [0, 800, 1200, 1500, 1800, 2000];
 const levelText = (d) => `≈ ${LEVEL_ELO[d]} Elo (prof. ${d})`;
 async function humanLine(fen, gen) {
   if (humanPv.has(fen)) return humanPv.get(fen);
   await engineChosen;
   const e = engine;
   try { await e.readyPromise; } catch { return null; }
-  const r = await e.analyse(fen, 2000, null, Math.min(5, Math.max(1, settings.level || 3)));
+  const depth = Math.min(5, Math.max(1, settings.level || 3));
+  const r = await e.analyse(fen, 2000, null, depth);
   if (gen !== generation || !r || !r.lines.length) return null;
-  humanPv.set(fen, r.lines[0].pv);
-  return r.lines[0].pv;
+  const pv = [...r.lines[0].pv];
+  // shallow searches often stop the line after one move: search the reply for the premove arrow
+  if (pv.length === 1) {
+    try {
+      const c = new Chess(fen);
+      c.move({ from: pv[0].slice(0, 2), to: pv[0].slice(2, 4), promotion: pv[0][4] });
+      const r2 = c.isGameOver() ? null : await e.analyse(c.fen(), 2000, null, depth);
+      if (gen !== generation) return null;
+      if (r2 && r2.lines.length) pv.push(r2.lines[0].pv[0]);
+    } catch { /* no premove then */ }
+  }
+  humanPv.set(fen, pv);
+  return pv;
 }
 /** "À jouer : humain Nf3 · meilleur Nf3" for the position after the move shown. */
 function renderNext(g) {
@@ -462,17 +498,16 @@ async function run() {
   }
   const last = sans.length - 1;
 
-  // 1. latest move, progressively, to the configured depth
+  // 0. the shallow line takes milliseconds: get it first so the play arrows show at once
+  if (settings.nextArrow || settings.oppArrow) {
+    await humanLine(fens[last + 1], gen);
+    if (gen !== generation) return;
+  }
+  // 1. latest move, progressively, to the configured depth (each snapshot redraws the arrows)
   const g = await gradePly(last, gen, settings.thinkMs, true);
   if (gen !== generation) return;
   if (g) renderCurrent();
   refresh();
-  if (g && !g.after.terminal && (settings.nextArrow || settings.oppArrow)) {
-    await humanLine(fens[last + 1], gen);
-    if (gen !== generation) return;
-    if (selected < 0 || selected === last) renderNext(g);
-    postGrade(g);
-  }
 
   // 2. earlier moves: a quick pass so the sheet and the profile fill fast, then a pass at
   // the full think time that refines them (each move needs one new search per pass)

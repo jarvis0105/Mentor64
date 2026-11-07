@@ -400,7 +400,20 @@
       pointerEvents: "auto",
     });
     document.documentElement.appendChild(frame);
+    chrome.storage.local.get(POS_KEY).then((r) => { if (r[POS_KEY]) placeFrame(r[POS_KEY]); }).catch(() => {});
     return frame;
+  }
+
+  // Where the launcher sits, as distances from the right and bottom edges (dragged by the user).
+  const POS_KEY = "mentor64Pos";
+  let pos = { r: 16, b: 16 }, dragStart = null;
+  function placeFrame(p) {
+    pos = {
+      r: Math.max(0, Math.min(p.r, window.innerWidth - 88)),
+      b: Math.max(0, Math.min(p.b, window.innerHeight - 88)),
+    };
+    frame.style.right = pos.r + "px";
+    frame.style.bottom = pos.b + "px";
   }
 
   function post(msg) {
@@ -614,8 +627,12 @@
       lastPayload = "";
       update();
     } else if (d.type === "movegrade:layout" && frame) {
-      frame.style.width = Math.max(88, Math.min(d.width, window.innerWidth - 24)) + "px";
-      frame.style.height = Math.max(88, Math.min(d.height, window.innerHeight - 24)) + "px";
+      frame.style.width = Math.max(88, Math.min(d.width, window.innerWidth - pos.r - 8)) + "px";
+      frame.style.height = Math.max(88, Math.min(d.height, window.innerHeight - pos.b - 8)) + "px";
+    } else if (d.type === "movegrade:drag" && frame && ev.source === frame.contentWindow) {
+      if (d.phase === "start") dragStart = { ...pos };
+      else if (d.phase === "move" && dragStart) placeFrame({ r: dragStart.r - d.dx, b: dragStart.b - d.dy });
+      else if (d.phase === "end") { dragStart = null; chrome.storage.local.set({ [POS_KEY]: pos }).catch(() => {}); }
     } else if (d.type === "movegrade:status") {
       engineStatus = d.status || "";
     } else if (d.type === "movegrade:pip" && frame && ev.source === frame.contentWindow) {
