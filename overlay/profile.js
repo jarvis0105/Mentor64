@@ -53,7 +53,10 @@ const START = { w: { b1: "n", g1: "n", c1: "b", f1: "b" }, b: { b8: "n", g8: "n"
 const BAD = new Set(["inaccuracy", "mistake", "miss", "blunder"]);
 // Fewer moves than this in a domain and it gets no score ("—") rather than a misleading one.
 const MIN_MOVES = 3;
-const score = (a) => (a.length >= MIN_MOVES ? avg(a) : null);
+// Mean of the plain and harmonic means, like the game accuracy: one blunder pulls a domain down
+// instead of vanishing among the easy moves.
+const harsh = (a) => (a.length ? (avg(a) + a.length / a.reduce((x, y) => x + 1 / Math.max(y, 1), 0)) / 2 : null);
+const score = (a) => (a.length >= MIN_MOVES ? harsh(a) : null);
 // Each piece left hanging costs the defence score this many points.
 const HANGING_PENALTY = 12;
 
@@ -176,12 +179,12 @@ export function analyseGame({ fens, sans, grades }, side) {
   } catch { /* keep 0 */ }
 
   const pieceAcc = {};
-  for (const t of ["n", "b", "r", "q"]) if (byPiece[t].length) pieceAcc[t] = { n: byPiece[t].length, acc: avg(byPiece[t]) };
+  for (const t of ["n", "b", "r", "q"]) if (byPiece[t].length) pieceAcc[t] = { n: byPiece[t].length, acc: harsh(byPiece[t]) };
   const ranked = Object.entries(pieceAcc).filter(([, v]) => v.n >= 2).sort((x, y) => y[1].acc - x[1].acc);
   const pieceMoves = [...byPiece.n, ...byPiece.b, ...byPiece.r, ...byPiece.q];
 
   // defence: accuracy under pressure, minus the pieces left hanging (which say as much)
-  const defBase = def.length >= MIN_MOVES ? avg(def) : hanging ? avg(all) : null;
+  const defBase = def.length >= MIN_MOVES ? harsh(def) : hanging ? harsh(all) : null;
   const defScore = defBase === null ? null : Math.max(0, defBase - HANGING_PENALTY * hanging);
 
   const domains = [
