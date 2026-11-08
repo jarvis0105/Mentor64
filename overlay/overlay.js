@@ -8,7 +8,7 @@ import { coachTip } from "./coach.js";
 import { principlesFor } from "./principles.js";
 import { THEMES, moveThemes } from "./themes.js";
 import { openingSuggestions } from "./openings.js";
-import { analyseGame, gameRecord, upsertRecord, buildProfile, moveAccuracy, verdict } from "./profile.js";
+import { analyseGame, gameRecord, upsertRecord, buildProfile, gameAccuracy, verdict } from "./profile.js";
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -592,7 +592,6 @@ function setRing(textEl, ringEl, value) {
 
 function renderSummary() {
   const counts = { w: {}, b: {} };
-  const acc = { w: [], b: [] };
   let graded = 0;
   for (let i = 0; i < sans.length; i++) {
     const g = grades[i];
@@ -600,7 +599,6 @@ function renderSummary() {
     graded++;
     const side = i % 2 === 0 ? "w" : "b";
     counts[side][g.cat] = (counts[side][g.cat] || 0) + 1;
-    if (g.cat !== "none") acc[side].push(moveAccuracy(g.loss || 0));
   }
   for (const cat of TABLE_CATS) {
     const w = counts.w[cat] || 0, b = counts.b[cat] || 0;
@@ -608,9 +606,8 @@ function renderSummary() {
     cells[cat].b.textContent = b;
     cells[cat].row.classList.toggle("zero", w + b === 0);
   }
-  const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
-  setRing(els.accW, els.ringW, avg(acc.w));
-  setRing(els.accB, els.ringB, avg(acc.b));
+  setRing(els.accW, els.ringW, gameAccuracy(grades.slice(0, sans.length), "w"));
+  setRing(els.accB, els.ringB, gameAccuracy(grades.slice(0, sans.length), "b"));
 
   els.caption.textContent = !sans.length ? "" :
     graded < sans.length ? `Analyse en cours : ${graded}/${sans.length} coups` : `${sans.length} coups analysés`;

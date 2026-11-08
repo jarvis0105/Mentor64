@@ -13,9 +13,39 @@
 
 import { Chess } from "../lib/chess.js";
 import { phaseOf, relRank, PIECE_FR, tacticsOf, bestMoveOf } from "./coach.js";
+import { winPct, lineToCp } from "./classify.js";
 
-/** lichess's per-move accuracy curve, applied to the win% lost on a move. */
-export const moveAccuracy = (loss) => Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * loss) - 3.1669));
+/** lichess's per-move accuracy curve, applied to the win% lost on a move (+1: lichess' uncertainty bonus). */
+export const moveAccuracy = (loss) => Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * loss) - 3.1669 + 1));
+
+/**
+ * Game accuracy the lichess way: the mean of (1) a mean weighted by how sharp the position was
+ * (std-dev of White's win% over a sliding window) and (2) the harmonic mean, which lets a few
+ * big mistakes weigh like they do. A plain average let 30 easy moves bury 2 blunders.
+ */
+export function gameAccuracy(grades, side) {
+  const plies = grades.length;
+  // White's win% before each ply (carried over where a ply is not graded yet)
+  const wins = [];
+  let last = 50;
+  for (let i = 0; i <= plies; i++) {
+    const g = grades[i];
+    const line = g && g.before && g.before.lines && g.before.lines[0];
+    if (line) { const w = winPct(lineToCp(line)); last = i % 2 === 0 ? w : 100 - w; }
+    wins.push(last);
+  }
+  const size = Math.max(2, Math.min(8, Math.floor(plies / 10)));
+  const sd = (a) => { const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length); };
+  const weightAt = (i) => Math.max(0.5, Math.min(12, sd(wins.slice(Math.max(0, i + 1 - size), Math.max(size, i + 1) + 1))));
+  let ws = 0, w = 0, inv = 0, n = 0;
+  for (let i = side === "w" ? 0 : 1; i < plies; i += 2) {
+    const g = grades[i];
+    if (!g || g.cat === "none") continue;
+    const a = moveAccuracy(g.loss || 0), k = weightAt(i);
+    ws += a * k; w += k; inv += 1 / Math.max(a, 1); n++;
+  }
+  return n ? (ws / w + n / inv) / 2 : null;
+}
 
 const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 const VAL = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -174,7 +204,7 @@ export function analyseGame({ fens, sans, grades }, side) {
   ].map((d) => ({ ...d, label: DOMAIN_FR[d.key] }));
 
   return {
-    side, acc: avg(all), domains, pieces: pieceAcc, errors, style: st, opening, tactics: tac, bookExit,
+    side, acc: gameAccuracy(grades, side), domains, pieces: pieceAcc, errors, style: st, opening, tactics: tac, bookExit,
     flags: { lateCastle: !castledAt || castledAt > 12, slowDev: developed < 3 },
   };
 }
